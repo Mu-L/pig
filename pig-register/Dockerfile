@@ -1,6 +1,4 @@
-FROM moxm/java:1.8-full
-
-RUN mkdir -p /pig-register
+FROM registry.cn-hangzhou.aliyuncs.com/dockerhub_mirror/java:1.8-full
 
 WORKDIR /pig-register
 
@@ -12,4 +10,4 @@ EXPOSE 8848
 
 ENV TZ=Asia/Shanghai JAVA_OPTS="-Xms128m -Xmx256m -Djava.security.egd=file:/dev/./urandom"
 
-CMD sleep 30; java -jar app.jar $JAVA_OPTS
+CMD sleep 30; java $JAVA_OPTS -jar app.jar

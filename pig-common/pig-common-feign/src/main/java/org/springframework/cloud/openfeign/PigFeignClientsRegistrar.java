@@ -25,6 +25,7 @@ import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.beans.factory.support.BeanDefinitionBuilder;
 import org.springframework.beans.factory.support.BeanDefinitionReaderUtils;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
+import org.springframework.boot.context.annotation.ImportCandidates;
 import org.springframework.context.EnvironmentAware;
 import org.springframework.context.annotation.ImportBeanDefinitionRegistrar;
 import org.springframework.core.annotation.AnnotatedElementUtils;
@@ -35,6 +36,7 @@ import org.springframework.core.type.AnnotationMetadata;
 import org.springframework.lang.Nullable;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -45,6 +47,8 @@ import java.util.Map;
  * feign 自动配置功能 from mica
  */
 public class PigFeignClientsRegistrar implements ImportBeanDefinitionRegistrar, BeanClassLoaderAware, EnvironmentAware {
+
+	private final static String BASE_URL = "http://127.0.0.1:${server.port}${server.servlet.context-path}";
 
 	@Getter
 	private ClassLoader beanClassLoader;
@@ -63,8 +67,12 @@ public class PigFeignClientsRegistrar implements ImportBeanDefinitionRegistrar, 
 	}
 
 	private void registerFeignClients(BeanDefinitionRegistry registry) {
-		List<String> feignClients = SpringFactoriesLoader.loadFactoryNames(getSpringFactoriesLoaderFactoryClass(),
-				getBeanClassLoader());
+
+		List<String> feignClients = new ArrayList<>(
+				SpringFactoriesLoader.loadFactoryNames(getSpringFactoriesLoaderFactoryClass(), getBeanClassLoader()));
+
+		// 支持 springboot 2.7 + 最新版本的配置方式
+		ImportCandidates.load(FeignClient.class, getBeanClassLoader()).forEach(feignClients::add);
 		// 如果 spring.factories 里为空
 		if (feignClients.isEmpty()) {
 			return;
@@ -77,16 +85,20 @@ public class PigFeignClientsRegistrar implements ImportBeanDefinitionRegistrar, 
 				if (attributes == null) {
 					continue;
 				}
+
+				// 如果是单体项目自动注入 & url 为空
+				Boolean isMicro = environment.getProperty("spring.cloud.nacos.discovery.enabled", Boolean.class, true);
 				// 如果已经存在该 bean，支持原生的 Feign
-				if (registry.containsBeanDefinition(className)) {
+				if (registry.containsBeanDefinition(className) && isMicro) {
 					continue;
 				}
+
 				registerClientConfiguration(registry, getClientName(attributes), attributes.get("configuration"));
 
 				validate(attributes);
 				BeanDefinitionBuilder definition = BeanDefinitionBuilder
-						.genericBeanDefinition(FeignClientFactoryBean.class);
-				definition.addPropertyValue("url", getUrl(attributes));
+					.genericBeanDefinition(FeignClientFactoryBean.class);
+				definition.addPropertyValue("url", getUrl(registry, attributes));
 				definition.addPropertyValue("path", getPath(attributes));
 				String name = getName(attributes);
 				definition.addPropertyValue("name", name);
@@ -179,8 +191,17 @@ public class PigFeignClientsRegistrar implements ImportBeanDefinitionRegistrar, 
 		return value;
 	}
 
-	private String getUrl(Map<String, Object> attributes) {
-		String url = resolve((String) attributes.get("url"));
+	private String getUrl(BeanDefinitionRegistry registry, Map<String, Object> attributes) {
+
+		// 如果是单体项目自动注入 & url 为空
+		Boolean isMicro = environment.getProperty("spring.cloud.nacos.discovery.enabled", Boolean.class, true);
+
+		if (isMicro) {
+			return null;
+		}
+
+		String url = resolve(BASE_URL);
+
 		return FeignClientsRegistrar.getUrl(url);
 	}
 

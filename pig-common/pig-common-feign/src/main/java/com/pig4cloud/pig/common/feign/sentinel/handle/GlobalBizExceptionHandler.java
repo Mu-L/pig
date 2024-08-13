@@ -20,6 +20,7 @@ import com.alibaba.csp.sentinel.Tracer;
 import com.pig4cloud.pig.common.core.util.R;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.SpringSecurityMessageSource;
@@ -42,6 +43,7 @@ import java.util.List;
  * @date 2020-06-29
  */
 @Slf4j
+@Order(10000)
 @RestControllerAdvice
 @ConditionalOnExpression("!'${security.oauth2.client.clientId}'.isEmpty()")
 public class GlobalBizExceptionHandler {
@@ -86,10 +88,10 @@ public class GlobalBizExceptionHandler {
 	@ExceptionHandler(AccessDeniedException.class)
 	@ResponseStatus(HttpStatus.FORBIDDEN)
 	public R handleAccessDeniedException(AccessDeniedException e) {
-		String msg = SpringSecurityMessageSource.getAccessor().getMessage("AbstractAccessDecisionManager.accessDenied",
-				e.getMessage());
-		log.error("拒绝授权异常信息 ex={}", msg, e);
-		return R.failed(e.getLocalizedMessage());
+		String msg = SpringSecurityMessageSource.getAccessor()
+			.getMessage("AbstractAccessDecisionManager.accessDenied", e.getMessage());
+		log.warn("拒绝授权异常信息 ex={}", msg);
+		return R.failed(msg);
 	}
 
 	/**
@@ -102,7 +104,7 @@ public class GlobalBizExceptionHandler {
 	public R handleBodyValidException(MethodArgumentNotValidException exception) {
 		List<FieldError> fieldErrors = exception.getBindingResult().getFieldErrors();
 		log.warn("参数绑定异常,ex = {}", fieldErrors.get(0).getDefaultMessage());
-		return R.failed(fieldErrors.get(0).getDefaultMessage());
+		return R.failed(String.format("%s %s", fieldErrors.get(0).getField(), fieldErrors.get(0).getDefaultMessage()));
 	}
 
 	/**

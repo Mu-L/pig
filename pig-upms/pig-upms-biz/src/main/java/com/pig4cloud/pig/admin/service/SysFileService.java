@@ -20,9 +20,8 @@ package com.pig4cloud.pig.admin.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.pig4cloud.pig.admin.api.entity.SysFile;
 import com.pig4cloud.pig.common.core.util.R;
-import org.springframework.web.multipart.MultipartFile;
-
 import javax.servlet.http.HttpServletResponse;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 文件管理

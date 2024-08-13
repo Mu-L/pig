@@ -17,13 +17,11 @@
 package com.pig4cloud.pig.common.core.util;
 
 import cn.hutool.core.codec.Base64;
-import cn.hutool.json.JSONUtil;
 import com.pig4cloud.pig.common.core.exception.CheckedException;
 import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -34,9 +32,6 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.constraints.NotNull;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
@@ -110,13 +105,20 @@ public class WebUtils extends org.springframework.web.util.WebUtils {
 		response.addCookie(cookie);
 	}
 
+	public ServletRequestAttributes getServletRequestAttributes() {
+		return (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+	}
+
 	/**
 	 * 获取 HttpServletRequest
 	 * @return {HttpServletRequest}
 	 */
 	public Optional<HttpServletRequest> getRequest() {
-		return Optional
-				.ofNullable(((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest());
+		ServletRequestAttributes servletRequestAttributes = getServletRequestAttributes();
+		if (servletRequestAttributes == null) {
+			return Optional.empty();
+		}
+		return Optional.of(servletRequestAttributes.getRequest());
 	}
 
 	/**
@@ -124,33 +126,11 @@ public class WebUtils extends org.springframework.web.util.WebUtils {
 	 * @return {HttpServletResponse}
 	 */
 	public HttpServletResponse getResponse() {
-		return ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getResponse();
-	}
-
-	/**
-	 * 返回json
-	 * @param response HttpServletResponse
-	 * @param result 结果对象
-	 */
-	public void renderJson(HttpServletResponse response, Object result) {
-		renderJson(response, result, MediaType.APPLICATION_JSON_VALUE);
-	}
-
-	/**
-	 * 返回json
-	 * @param response HttpServletResponse
-	 * @param result 结果对象
-	 * @param contentType contentType
-	 */
-	public void renderJson(HttpServletResponse response, Object result, String contentType) {
-		response.setCharacterEncoding("UTF-8");
-		response.setContentType(contentType);
-		try (PrintWriter out = response.getWriter()) {
-			out.append(JSONUtil.toJsonStr(result));
+		ServletRequestAttributes servletRequestAttributes = getServletRequestAttributes();
+		if (servletRequestAttributes == null) {
+			throw new CheckedException("无法获取HttpServletRequest");
 		}
-		catch (IOException e) {
-			log.error(e.getMessage(), e);
-		}
+		return servletRequestAttributes.getResponse();
 	}
 
 	/**
@@ -164,7 +144,7 @@ public class WebUtils extends org.springframework.web.util.WebUtils {
 	}
 
 	@SneakyThrows
-	public String getClientId(HttpServletRequest request) {
+	public String getClientId() {
 		if (WebUtils.getRequest().isPresent()) {
 			String header = WebUtils.getRequest().get().getHeader(HttpHeaders.AUTHORIZATION);
 			return splitClient(header)[0];
@@ -173,7 +153,7 @@ public class WebUtils extends org.springframework.web.util.WebUtils {
 	}
 
 	@NotNull
-	private static String[] splitClient(String header) throws UnsupportedEncodingException {
+	private static String[] splitClient(String header) {
 		if (header == null || !header.startsWith(BASIC_)) {
 			throw new CheckedException("请求头中client信息为空");
 		}
